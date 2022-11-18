@@ -5,19 +5,18 @@ from qualang_tools.config.integration_weights_tools import convert_integration_w
 simulate = False
 
 # Frequencies
-NV_IF_freq = 306.25e6  # in units of Hz
+NV_IF_freq = 300e6  # in units of Hz
 NV_LO_freq = 2.57e9  # in units of Hz
-"""
-Configuration file for the NV Center confocal setup.
-"""
+
 # Pulses lengths
 laser_len = 3000  # in ns
-meas_len = 600  # in ns
-long_meas_len = 10e6  # in ns
-odmr_meas_len = 1e6
+meas_len = 3000 # in ns
+long_meas_len = 10e6 # in ns
+odmr_meas_len = 15e6
+
 
 # MW parameters
-mw_amp_NV = 0.04  # in units of volts
+mw_amp_NV = 0.07   # in units of volts
 mw_len_NV = 100  # in units of ns
 
 # Gaussian pulse parameters
@@ -38,8 +37,7 @@ def IQ_imbalance(g, phi):
     c = np.cos(phi)
     s = np.sin(phi)
     n = 1 / ((1 - g ** 2) * (2 * c ** 2 - 1))
-    return [float(n * x) for x in [(1 - g) * c, (1 + g) * s, (1 - g) * s, (1 + g) * c]]
-
+    return [float(n * x) for x in [(1 - g) * c,(1 + g) * s, (1 - g) * s, (1 + g) * c]]
 
 config = {
 
@@ -55,29 +53,28 @@ config = {
                 # qm.set_dc_offset_by_qe('NV', 'I', 0.0114)
                 # qm.set_dc_offset_by_qe('NV', 'Q', -0.0024)
                 # LO Leakage Setup for Widefield Antenna
-                # 1: {'offset': 0.0152, 'delay': 73}, #75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
-                # 2: {'offset': 0.002, 'delay': 73}, #75},  # NV Q
+                #1: {'offset': 0.0152, 'delay': 73}, #75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
+                #2: {'offset': 0.002, 'delay': 73}, #75},  # NV Q
 
                 # LO Leakage Setup for Confocal Antenna / Ist nicht schlecht als Kompromiss für beides
-                # 1: {'offset': 0.0152, 'delay': 80}, #75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
-                # 2: {'offset': 0.002, 'delay': 80}, #75},  # NV Q
+                1: {'offset': 0.0152, 'delay': 80}, #75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
+                2: {'offset': 0.002, 'delay': 80}, #75},  # NV Q
 
-                # LO Leakage for Confocal Antenna for 0.07 Vp OPX Config
-                1: {'offset': 0.013, 'delay': 80},  # 75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
-                2: {'offset': 0.001, 'delay': 80},  # 75},  # NV Q
+                #1: {'offset': 0.0152, 'delay': 200},  # 75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
+                #2: {'offset': 0.002, 'delay': 200},  # 75},  # NV Q
 
                 4: {'offset': 0.0},
 
             },
             'digital_outputs': {
                 1: {},  # AOM/Laser
-                # 2: {},  # Photo diode - indicator
+                #2: {},  # Photo diode - indicator
                 3: {},  # MW Trigger
 
             },
             'analog_inputs': {
                 1: {'offset': 0},  # photo diode
-                # 2: {'offset': 0},  # photo diode
+                #2: {'offset': 0},  # photo diode
             }
         }
     },
@@ -88,11 +85,11 @@ config = {
             'mixInputs': {
                 'I': ('con1', 1),
                 'Q': ('con1', 2),
-                # 'marker': {
+                #'marker': {
                 #    'port': ('con1', 3),
                 #    'delay': 0,
                 #    'buffer': 0,
-                # },
+                #},
                 'lo_frequency': NV_LO_freq,
                 'mixer': 'mixer_qubit'
             },
@@ -131,37 +128,37 @@ config = {
         },
 
         'APD': {
-            "singleInput": {"port": ("con1", 4)},  # empty
-            # 'digitalInputs': {
+            "singleInput": {"port": ("con1", 4)}, # empty
+            #'digitalInputs': {
             #    'marker': {
             #        'port': ('con1', 2),
             #        'delay': 0,
             #        'buffer': 0,
             #    },
-            # },
+            #},
             'operations': {
                 'readout_cw': 'full_readout_pulse',
                 'readout': 'readout_pulse'
             },
             "outputs": {"out1": ("con1", 1)},
             'outputPulseParameters': {
-                'signalThreshold': -500,  # -int(0.2/0.5*2048) - Counts arrive as NEGATIVE dips at the device
+                'signalThreshold': -500, # -int(0.2/0.5*2048) - Counts arrive as NEGATIVE dips at the device
                 'signalPolarity': 'Descending',
                 'derivativeThreshold': 1023,
                 'derivativePolarity': 'Descending'
             },
-            'time_of_flight': 432,
+            'time_of_flight': 436,
             'smearing': 0,
         },
         'APD2': {
             "singleInput": {"port": ("con1", 4)},  # empty
-            # 'digitalInputs': {
+            #'digitalInputs': {
             #    'marker': {
             #        'port': ('con1', 2),
             #        'delay': 0,
             #        'buffer': 0,
             #    },
-            # },
+            #},
             'operations': {
                 'readout_cw': 'full_readout_pulse',
                 'readout': 'readout_pulse'
@@ -173,7 +170,7 @@ config = {
                 'derivativeThreshold': 1023,
                 'derivativePolarity': 'Descending'
             },
-            'time_of_flight': 432,
+            'time_of_flight': 436,
             'smearing': 0,
         },
     },
@@ -187,7 +184,7 @@ config = {
                 "I": "NV_const_wf",
                 "Q": "zero_wf"
             },
-            # 'digital_marker': 'ON',
+            #'digital_marker': 'ON',
         },
 
         'NV_gauss_pulse': {
@@ -210,7 +207,7 @@ config = {
 
         'NV_pi_half_pulse': {
             'operation': "control",
-            'length': pi_len_NV / 2,
+            'length': pi_len_NV/2,
             'waveforms': {
                 "I": "NV_pi_wf",
                 "Q": "zero_wf"
@@ -278,13 +275,10 @@ config = {
         'mixer_qubit': [
             {'intermediate_frequency': NV_IF_freq, 'lo_frequency': NV_LO_freq,
              # IQ Imbalance for Widefield Setup
-             # 'correction': IQ_imbalance(-0.0075, -0.17)},  # (Amplitude, Phase) Imbalances!
+             #'correction': IQ_imbalance(-0.0075, -0.17)},  # (Amplitude, Phase) Imbalances!
 
              # IQ Imbalance for Confocal Setup / Funktioniert als Kompromiss für beide Setups
-             # 'correction': IQ_imbalance(-0.0075, -0.17)},  # (Amplitude, Phase) Imbalances!
-             # IQ Imbalance for Confocal Setup / Funktioniert als Kompromiss für beide Setups
-             # Hier liegen LO UND LO-IF >40 dBm unter LO+IF!!
-             'correction': IQ_imbalance(0.40, -0.11)},  # (Amplitude, Phase) Imbalances!
-        ],
+             'correction': IQ_imbalance(-0.0075, -0.17)},  # (Amplitude, Phase) Imbalances!
+],
     },
 }

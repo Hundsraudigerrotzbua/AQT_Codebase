@@ -1,317 +1,369 @@
+import datetime
 from qm.QuantumMachinesManager import QuantumMachinesManager
 from qm.qua import *
-import matplotlib
-
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
-from configuration import *
 from qm import SimulationConfig
-import scipy.optimize as so
-from lib.QuantechPlots import *
+from configuration import *
+from qualang_tools.plot import interrupt_on_close
+from qualang_tools.results import progress_counter, fetching_tool
+from lib.plot_lib import *
+from lib.qudi_communication import run_kernel_command
 
 
-def readout(element, timestamps, length, counts, counts_stream):
-    play('laser_ON', 'AOM')
-    measure('readout', element, None,
-            time_tagging.analog(timestamps, length, counts))
-    save(counts, counts_stream)  # save counts
+def cw_odmr(qmm, qm, fig, settings, prev_counts, prev_iterations, simulate=False, ax=None):
+    """
+    Continuous Wave ODMR Sequence
+    :param qmm: Quantum Machines Manager Instance
+    :param qm: Quantum Machine to perform measurement in.
+    :param fig: Pyplot Figure handle to plot the live image in.
+    :param settings: The specified measurement settings.
+    :param prev_counts: The measured photon counts of the previous iteration.
+    :param prev_iterations: The current iterations at the start of this measurement run.
+    :param simulate: Simulation Flag.
+    :param ax: Pyplot axis to plot in.
+    :return: Current photon counts, current measurement iteration.
+    """
+    n_avg = settings['n_avg']
+    f_vec = settings['f_vec']
+    with program() as cwodmr:
+        counts_val = declare(int)  # variable for number of counts
+        counts_st = declare_stream()  # stream for counts
+        timestamps = declare(int, size=1000)
+        i = declare(int)  # variable to for_loop
+        n = declare(int)  # number of iterations
+        n_st = declare_stream()  # stream for number of iterations
+        test_counts = declare(int, size=len(f_vec))
+        freq_vec = declare(int, value=[int(x) for x in f_vec])
 
-
-def end_sequence(job, qmm):
-    job.halt()
-    qmm.close()
-
-
-def hahn_echo_decay_fit(x, y, T2_guess = 100):
-    def func(x, a, b, c):
-        return a * np.exp(-x / b) + c
-
-    a, b = so.curve_fit(func, x, y, p0=(0.1, T2_guess, 1))
-    return x, func(x, *a), a[1]
-
-
-def hahn_echo(t_min, t_max, dt, n_avg=1e6, ampli=2, pulse_time=80, plot=1, fit=True, savefig=None):
-    qmm = QuantumMachinesManager(host="192.168.1.254", port='80')
-    qm = qmm.open_qm(config)
-    t_vec = np.arange(t_min, t_max + 0.1, dt)  # +dt/2 to include t_max in array
-    t_min //= 4
-    t_max //= 4
-    dt //= 4
-    with program() as hahn_echo:
-        counts1 = declare(int)  # saves number of photon counts
-        counts2 = declare(int)  # saves number of photon counts
-        counts_1_st = declare_stream()  # stream for counts
-        counts_2_st = declare_stream()  # stream for counts
-        timestamps_1 = declare(int, size=100)
-        timestamps_2 = declare(int, size=100)
-        t = declare(int)  # variable to sweep over in time
-        n = declare(int)  # variable to for_loop
-        n_st = declare_stream()  # stream to save iterations
-        play('laser_ON', 'AOM')  # Photoluminescence
-        wait(100)
         with for_(n, 0, n < n_avg, n + 1):
-            with for_(t, t_min, t <= t_max, t + dt):
-                reset_frame('NV')
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # pulse of varied lengths
-                wait(t / 2, 'NV')
-                # frame_rotation_2pi(1/2, 'NV')
-                play('pi' * amp(ampli), 'NV', duration=pulse_time // 4)  # pulse of varied lengths
-                wait(t / 2, 'NV')
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # pulse of varied lengths
-                align()
-                wait(4)
-                readout('APD', timestamps_1, meas_len, counts1, counts_1_st)
-                # play('laser_ON', 'AOM')
-                # measure('readout', 'APD', None,
-                #        time_tagging.analog(timestamps_1, meas_len, counts1))
-                # save(counts1, counts_1_st)  # save counts
-                wait(100)
+            with for_(i, 0, i < test_counts.length(), i + 1):
+                update_frequency('NV', freq_vec[i])  # updated frequency
+                align()  # align all elements
+                play('const', 'NV', duration=int(odmr_meas_len // 4))  # play microwave pulse
+                play('laser_ON', 'AOM', duration=int(odmr_meas_len // 4))  # Photoluminescence
+                measure('readout_cw', 'APD', None,
+                        time_tagging.analog(timestamps, odmr_meas_len, counts_val))
+                assign(test_counts[i], counts_val + test_counts[i])
+                save(test_counts[i], counts_st)  # save counts
+                save(n, n_st)  # save number of iteration inside for_loop
 
-                align()
-
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # Pi/2 pulse to qubit
-                wait(t, 'NV')  # variable delay in spin Echo
-                play('pi' * amp(ampli), 'NV', duration=pulse_time // 4)  # Pi pulse to qubit
-                wait(t, 'NV')  # variable delay in spin Echo
-                frame_rotation_2pi(0.5, 'NV')
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # Pi/2 pulse to qubit
-                reset_frame('NV')
-                align()
-                readout('APD', timestamps_2, meas_len, counts2, counts_2_st)
-                # play('laser_ON', 'AOM')
-                # measure('readout', 'APD', None,
-                #        time_tagging.analog(timestamps_2, meas_len, counts2))
-                # save(counts2, counts_2_st)  # save counts
-                wait(100)
-            save(n, n_st)  # save number of iteration inside for_loop
         with stream_processing():
-            counts_1_st.buffer(len(t_vec)).average().save('signal1')
-            counts_2_st.buffer(len(t_vec)).average().save('signal2')
-            n_st.save('iteration')
-    job = qm.execute(hahn_echo)  # execute QUA program
+            counts_st.buffer(len(f_vec)).save("counts")
+            n_st.save("iteration")
 
-    res_handle = job.result_handles  # get access to handles
-    vec_handle1 = res_handle.get('signal1')
-    vec_handle2 = res_handle.get('signal2')
-    vec_handle1.wait_for_values(1)
-    iteration_handle = res_handle.get('iteration')
-    iteration_handle.wait_for_values(1)
-    while vec_handle1.is_processing():
-        if plot:
-            try:
-                signal1 = vec_handle1.fetch_all()
-                signal2 = vec_handle2.fetch_all()
-                iteration = iteration_handle.fetch_all() + 1
-            except Exception as e:
-                pass
-            else:
-                hahn_echo_plot(t_vec, signal1, signal2, T2_guess=100, fit=fit)
-                #y = (np.abs(signal1 - signal2)) / np.max(signal1)
-                #_, y_fit, T2 = hahn_echo_decay_fit(t_vec, y)
-                #plt.plot(t_vec, y, 'o', label=f'Signal')  # / (meas_len*1e-9))
-                #plt.plot(t_vec, y_fit, label=f'Exponential Fit')
-                #plt.plot([T2, T2], [np.min(y), np.max(y)], 'k--', label=f'T2 = {np.around(T2, 1)} ns')
-                #plt.xlabel('t [ns]')
-                #plt.ylabel('Echo Signal')
-                plt.title(f'Hahn Echo - {np.around(pi_amp_NV * ampli, 3)} Vpp; {int(iteration/n_avg * 100)}%')
-                #plt.legend()
-                plt.pause(0.1)
-                plt.clf()
+    if simulate:
+        simulation_config = SimulationConfig(duration=28000)
+        job = qmm.simulate(config, cwodmr, simulation_config)
+        job.get_simulated_samples().con1.plot()
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        return np.zeros(len(f_vec)), 0
+    else:
+        job = qm.execute(cwodmr)
+        print('Grabbing Handle')
+        res_handles = job.result_handles
+        print('Grabbing counts handle')
+        times_handle = res_handles.get("counts")
+        print('Grabbing iteration handle')
+        iteration_handle = res_handles.get("iteration")
+        print('Waiting for times value')
+        times_handle.wait_for_values(1)
+        print('Waiting for iteration value')
+        iteration_handle.wait_for_values(1)
+        results = fetching_tool(job, data_list=["counts", "iteration"], mode="live")
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        while results.is_processing():
+            counts, iteration = results.fetch_all()
 
-    signal1 = vec_handle1.fetch_all()
-    signal2 = vec_handle2.fetch_all()
-    iteration = iteration_handle.fetch_all() + 1
-    if plot:
-        hahn_echo_plot(t_vec, signal1, signal2, T2_guess=100, fit=fit)
-        #y = (np.abs(signal1 - signal2)) / np.max(signal1)
-        #_, y_fit, T2 = hahn_echo_decay_fit(t_vec, y)
-        #plt.plot(t_vec, y, 'o', label=f'Signal')  # / (meas_len*1e-9))
-        #plt.plot(t_vec, y_fit, label=f'Exponential Fit')
-        #plt.plot([T2, T2], [np.min(y), np.max(y)], 'k--', label=f'T2 = {np.around(T2, 1)} ns')
-        #plt.xlabel('t [ns]')
-        #plt.ylabel('Echo Signal')
-        plt.title(f'Hahn Echo - {np.around(pi_amp_NV * ampli, 3)} Vpp; {int(iteration / n_avg * 100)}%')
-        #plt.legend()
-        if savefig is not None:
-            plt.savefig(savefig + '.png')
-    end_sequence(job, qmm)
-    return t_vec, signal1, signal2, iteration
+            # Progress bar (Requires execution in console)
+            progress_counter(iteration, n_avg, start_time=results.get_start_time())
+
+            counts += prev_counts
+            iteration += prev_iterations
+
+            _, _ = plot_odmr_live(f_vec, counts, lw=4, fig=fig, AX=ax,
+                                  elapsed_iterations=iteration)
+        job.halt()
+        return counts, iteration
 
 
-def ramsey(t_min, t_max, dt, n_avg=1e6, ampli=2, pulse_time=80, plot=1, savefig=None):
-    qmm = QuantumMachinesManager(host="192.168.1.254", port='80')
-    qm = qmm.open_qm(config)
-    t_vec = np.arange(t_min, t_max + 0.5, dt)  # +dt/2 to include t_max in array
-    t_min //= 4
-    t_max //= 4
-    dt //= 4
-    with program() as ramsey:
-        counts1 = declare(int)  # saves number of photon counts
-        counts2 = declare(int)  # saves number of photon counts
-        counts_1_st = declare_stream()  # stream for counts
-        counts_2_st = declare_stream()  # stream for counts
-        timestamps_1 = declare(int, size=100)
-        timestamps_2 = declare(int, size=100)
-        t = declare(int)  # variable to sweep over in time
-        n = declare(int)  # variable to for_loop
-        n_st = declare_stream()  # stream to save iterations
-        play('laser_ON', 'AOM')  # Photoluminescence
-        with for_(n, 0, n < n_avg, n + 1):
-            with for_(t, t_min, t <= t_max, t + dt):
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # pulse of varied lengths
-                wait(t, 'NV')
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # pulse of varied lengths
-                align()
-                wait(4)
-                readout('APD', timestamps_1, meas_len, counts1, counts_1_st)
-                # play('laser_ON', 'AOM')
-                # measure('readout', 'APD', None,
-                #        time_tagging.analog(timestamps_1, meas_len, counts1))
-                # save(counts1, counts_1_st)  # save counts
-                wait(10)
-                align()
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # pulse of varied lengths
-                wait(t, 'NV')
-                frame_rotation_2pi(0.5, 'NV')
-                play('pi_half' * amp(ampli), 'NV', duration=pulse_time // 4 / 2)  # pulse of varied lengths
-                align()
-                wait(4)
-                readout('APD', timestamps_2, meas_len, counts2, counts_2_st)
-                # play('laser_ON', 'AOM')
-                # measure('readout', 'APD', None,
-                #        time_tagging.analog(timestamps_2, meas_len, counts2))
-                # save(counts2, counts_2_st)  # save counts
-                wait(10)
-            save(n, n_st)  # save number of iteration inside for_loop
-        with stream_processing():
-            counts_1_st.buffer(len(t_vec)).average().save('signal1')
-            counts_2_st.buffer(len(t_vec)).average().save('signal2')
-            n_st.save('iteration')
-    job = qm.execute(ramsey)  # execute QUA program
-    res_handle = job.result_handles  # get access to handles
-    vec_handle1 = res_handle.get('signal1')
-    vec_handle2 = res_handle.get('signal2')
-    vec_handle1.wait_for_values(1)
-    iteration_handle = res_handle.get('iteration')
-    iteration_handle.wait_for_values(1)
-    while vec_handle1.is_processing():
-        if plot:
-            try:
-                signal1 = vec_handle1.fetch_all()
-                signal2 = vec_handle2.fetch_all()
-                iteration = iteration_handle.fetch_all() + 1
-            except Exception as e:
-                pass
-            else:
-                plt.plot(t_vec, (signal1 - signal2) / (meas_len * 1e-9))
-                plt.xlabel('t [ns]')
-                plt.ylabel('Signal [cps]')
-                plt.title(f'Ramsey - {pi_amp_NV * ampli} Vpp; {iteration} Iters')
-                plt.pause(0.1)
-                plt.clf()
-    signal1 = vec_handle1.fetch_all()
-    signal2 = vec_handle2.fetch_all()
-    if plot:
-        plt.plot(t_vec, (signal1 - signal2) / (meas_len * 1e-9))
-        plt.xlabel('t [ns]')
-        plt.ylabel('Signal [cps]')
-        plt.title(f'Ramsey - {pi_amp_NV * ampli} Vpp; {iteration} Iters')
-        if savefig is not None:
-            plt.savefig(savefig + '.png')
-    end_sequence(job, qmm)
-    return t_vec, signal1, signal2, iteration
 
 
-def rabi(t_min, t_max, dt, n_avg=1e6, ampli=2, plot=1, savefig=None):
-    t_vec = np.arange(t_min, t_max + 0.5, dt)  # +dt/2 to include t_max in array
-    qmm = QuantumMachinesManager(host="192.168.1.254", port='80')
-    qm = qmm.open_qm(config)
-    t_min //= 4
-    t_max //= 4
-    dt //= 4
-
-    def normalization(counts_1_st, counts_2_st):
-        counts_1 = declare(int)
-        counts_2 = declare(int)
-        timestamps1 = declare(int, size=100)
-        timestamps2 = declare(int, size=100)
-        play('laser_ON', 'AOM')
-        measure('readout', 'APD', None,
-                time_tagging.analog(timestamps1, meas_len, counts_1))
-        wait((laser_len - 3 * meas_len) // 4, 'APD2')
-        measure('readout', 'APD2', None,
-                time_tagging.analog(timestamps2, meas_len, counts_2))
-        save(counts_1, counts_1_st)
-        save(counts_2, counts_2_st)
-
+def time_rabi(qmm, qm, fig, settings, amplitude=1, frequency=300e6, prev_counts=0, prev_iterations=0, simulate=False,
+                    ax=None):
+    """
+    Rabi measurement that will sweep the duration of the microwave signal.
+    :param qmm: Quantum Machines Manager Instance
+    :param qm: Quantum Machine to perform measurement in.
+    :param fig: Pyplot Figure handle to plot the live image in.
+    :param settings: The specified measurement settings.
+    :param amplitude: Amplitude of the microwave signal. (Only values between -2 and 2-2**-16 are valid).
+    :param frequency: Frequency of the I-Q output for the microwave signal.
+    :param prev_counts: The measured photon counts of the previous iteration.
+    :param prev_iterations: The current iterations at the start of this measurement run.
+    :param simulate: Simulation Flag.
+    :param ax: Pyplot axis to plot in.
+    :return: Current photon counts, current measurement iteration.
+    """
+    t_vec = settings['t_vec']  # +0.1 to include t_max in array
+    n_avg = settings['n_avg']
     with program() as time_rabi:
-
-        counts_1_st = declare_stream()  # stream for counts
-        counts_2_st = declare_stream()  # stream for counts
-        t = declare(int)  # variable to sweep over in time
+        counts = declare(int)  # variable for number of counts
+        counts_st = declare_stream()  # stream for counts
+        times = declare(int, size=100)
         n = declare(int)  # variable to for_loop
+        i = declare(int)  # variable to for_loop
         n_st = declare_stream()  # stream to save iterations
-        play('laser_ON', 'AOM')  # Photoluminescence
+        test_counts = declare(int, size=len(t_vec))
+        times_vec = declare(int, value=[int(x) for x in t_vec])
+
+        play("laser_ON", "AOM")
+        wait(100, "AOM")
         with for_(n, 0, n < n_avg, n + 1):
-            with for_(t, t_min, t <= t_max, t + dt):
-                play('pi' * amp(ampli), 'NV', duration=t)  # pulse of varied lengths
+            with for_(i, 0, i < test_counts.length(), i + 1):
+                update_frequency('NV', frequency)
+                play("const" * amp(amplitude), "NV", duration=times_vec[i])  # pulse of varied lengths
                 align()
-                wait(4)
-                normalization(counts_1_st, counts_2_st)
+                play("laser_ON", "AOM")
+                measure("readout", "APD", None, time_tagging.analog(times, meas_len, counts))
+                assign(test_counts[i], counts + test_counts[i])
+                save(test_counts[i], counts_st)  # save counts
                 wait(100)
             save(n, n_st)  # save number of iteration inside for_loop
-        with stream_processing():
-            counts_1_st.buffer(len(t_vec)).average().save('signal1')
-            counts_2_st.buffer(len(t_vec)).average().save('signal2')
-            n_st.save('iteration')
-    job = qm.execute(time_rabi)  # execute QUA program
-    res_handle = job.result_handles  # get access to handles
-    vec_handle1 = res_handle.get('signal1')
-    vec_handle2 = res_handle.get('signal2')
-    vec_handle1.wait_for_values(1)
-    iteration_handle = res_handle.get('iteration')
-    iteration_handle.wait_for_values(1)
-    fig = plt.figure()
-    ax = plt.gca()
-    ax2 = ax.twinx()
-    while vec_handle1.is_processing():
-        if plot:
-            try:
-                signal1 = vec_handle1.fetch_all()
-                signal2 = vec_handle2.fetch_all()
-                iteration = iteration_handle.fetch_all() + 1
-            except Exception as e:
-                pass
-            else:
-                pl1 = ax.plot(t_vec, signal1, color='blue', label='Signal1')
-                pl2 = ax.plot(t_vec, signal2, color='red', label='Signal2')
-                pl3 = ax2.plot(t_vec, signal1 / signal2, color='k', label='Signal1/Signal2')
-                ax.set_xlabel('t [ns]')
-                ax.set_ylabel('Signal 1 and 2')
-                ax2.set_ylabel('Signal1/Signal2')
-                plt.title(f'Time Rabi normalized at {pi_amp_NV * ampli} V; {iteration} Iters')
-                ln = pl1 + pl2 + pl3
-                labs = [l.get_label() for l in ln]
-                plt.legend(ln, labs, loc=0)
-                plt.pause(0.1)
-                ax.clear()
-                ax2.clear()
 
-    signal1 = vec_handle1.fetch_all()
-    signal2 = vec_handle1.fetch_all()
-    if plot:
-        pl1 = ax.plot(t_vec, signal1, color='blue', label='Signal1')
-        pl2 = ax.plot(t_vec, signal2, color='red', label='Signal2')
-        pl3 = ax2.plot(t_vec, signal1 / signal2, color='k', label='Signal1/Signal2')
-        ln = pl1 + pl2 + pl3
-        labs = [l.get_label() for l in ln]
-        plt.legend(ln, labs, loc=0)
-        ax.set_xlabel('t [ns]')
-        ax.set_ylabel('Signal 1 and 2')
-        ax2.set_ylabel('Signal1/Signal2')
-        plt.title(f'Time Rabi normalized at {np.around(pi_amp_NV * ampli, 3)} V; {iteration} Iters')
-        plt.legend()
-        if savefig is not None:
-            plt.savefig(savefig + '.png')
-    end_sequence(job, qmm)
-    return t_vec, signal1, signal2, iteration
+        with stream_processing():
+            counts_st.buffer(len(t_vec)).save("counts")
+            n_st.save("iteration")
+    if simulate:
+        simulation_config = SimulationConfig(duration=28000)
+        job = qmm.simulate(config, time_rabi, simulation_config)
+        job.get_simulated_samples().con1.plot()
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        return np.zeros(len(t_vec)), 0
+    else:
+        job = qm.execute(time_rabi)
+        res_handles = job.result_handles
+        times_handle = res_handles.get("counts")
+        iteration_handle = res_handles.get("iteration")
+        times_handle.wait_for_values(1)
+        iteration_handle.wait_for_values(1)
+        results = fetching_tool(job, data_list=["counts", "iteration"], mode="live")
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        while results.is_processing():
+            counts, iteration = results.fetch_all()
+
+            # Progress bar (Requires execution in console)
+            progress_counter(iteration, n_avg, start_time=results.get_start_time())
+
+            counts += prev_counts
+            iteration += prev_iterations
+
+            fig, ax = plot_rabi_live(t_vec, counts, lw=4, fig=fig, ax=ax,
+                                     elapsed_iterations=iteration)
+        job.halt()
+        return counts, iteration
+
+
+def pulsed_odmr(qmm, qm, fig, settings, prev_counts=0, prev_iterations=0, simulate=False, ax=None):
+    """
+    Pulsed ODMR Sequence
+    :param qmm: Quantum Machines Manager Instance
+    :param qm: Quantum Machine to perform measurement in.
+    :param fig: Pyplot Figure handle to plot the live image in.
+    :param settings: The specified measurement settings.
+    :param prev_counts: The measured photon counts of the previous iteration.
+    :param prev_iterations: The current iterations at the start of this measurement run.
+    :param simulate: Simulation Flag.
+    :param ax: Pyplot axis to plot in.
+    :return: Current photon counts, current measurement iteration.
+    """
+    f_vec = settings['f_vec']  # +0.1 to include t_max in array
+    n_avg = settings['n_avg']
+    with program() as time_rabi:
+        counts = declare(int)  # variable for number of counts
+        counts_st = declare_stream()  # stream for counts
+        times = declare(int, size=100)
+        n = declare(int)  # variable to for_loop
+        i = declare(int)  # variable to for_loop
+        n_st = declare_stream()  # stream to save iterations
+        test_counts = declare(int, size=len(f_vec))
+        freq_vec = declare(int, value=[int(x) for x in f_vec])
+
+        play("laser_ON", "AOM")
+        wait(100, "AOM")
+        with for_(n, 0, n < n_avg, n + 1):
+            with for_(i, 0, i < test_counts.length(), i + 1):
+                update_frequency('NV', freq_vec[i])
+                play("const", "NV", duration=250 // 4)  # pulse of varied lengths
+                align()
+                play("laser_ON", "AOM")
+                measure("readout", "APD", None, time_tagging.analog(times, meas_len, counts))
+                assign(test_counts[i], counts + test_counts[i])
+                save(test_counts[i], counts_st)  # save counts
+                wait(100)
+            save(n, n_st)  # save number of iteration inside for_loop
+
+        with stream_processing():
+            counts_st.buffer(len(f_vec)).save("counts")
+            n_st.save("iteration")
+    if simulate:
+        simulation_config = SimulationConfig(duration=28000)
+        job = qmm.simulate(config, time_rabi, simulation_config)
+        job.get_simulated_samples().con1.plot()
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        return np.zeros(len(f_vec)), 0
+    else:
+        job = qm.execute(time_rabi)
+        res_handles = job.result_handles
+        times_handle = res_handles.get("counts")
+        iteration_handle = res_handles.get("iteration")
+        times_handle.wait_for_values(1)
+        iteration_handle.wait_for_values(1)
+        results = fetching_tool(job, data_list=["counts", "iteration"], mode="live")
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        while results.is_processing():
+            counts, iteration = results.fetch_all()
+
+            # Progress bar (Requires execution in console)
+            progress_counter(iteration, n_avg, start_time=results.get_start_time())
+
+            counts += prev_counts
+            iteration += prev_iterations
+
+            _, _ = plot_pulsed_odmr_live(f_vec, counts, lw=4, fig=fig, AX=ax,
+                                         elapsed_iterations=iteration)
+        job.halt()
+        return counts, iteration
+
+
+def ramsey(qmm, qm, fig, settings, prev_counts=0, prev_counts2=0, prev_iterations=0, simulate=False, ax=None):
+    """
+
+    :param qmm: Quantum Machines Manager Instance
+    :param qm: Quantum Machine to perform measurement in.
+    :param fig: Pyplot Figure handle to plot the live image in.
+    :param settings: The specified measurement settings.
+    :param prev_counts: The measured photon counts of the previous iteration.
+    :param prev_counts2: The measured photons of the previous iteration after the frame rotation to a -pi/2 pulse.
+    :param prev_iterations: The current iterations at the start of this measurement run.
+    :param simulate: Simulation Flag.
+    :param ax: Pyplot axis to plot in.
+    :return: Current photon counts, current measurement iteration.
+    """
+    t_vec = settings['t_vec']  # +0.1 to include t_max in array
+    n_avg = settings['n_avg']
+    with program() as time_rabi:
+        counts = declare(int)  # variable for number of counts
+        counts_st = declare_stream()  # stream for counts
+
+        counts2 = declare(int)  # variable for number of counts
+        counts_2_st = declare_stream()  # stream for counts
+
+        times = declare(int, size=100)
+        times2 = declare(int, size=100)
+        n = declare(int)  # variable to for_loop
+        i = declare(int)  # variable to for_loop
+        n_st = declare_stream()  # stream to save iterations
+        test_counts = declare(int, size=len(t_vec))
+        times_vec = declare(int, value=[int(x) for x in t_vec])
+
+        play("laser_ON", "AOM")
+        wait(100, "AOM")
+        with for_(n, 0, n < n_avg, n + 1):
+            with for_(i, 0, i < test_counts.length(), i + 1):
+                play("const", "NV", duration=262.2 // 4)  # pulse of varied lengths
+                align()
+                wait(times_vec[i], 'NV')
+                play("const", "NV", duration=262.2 // 4)  # pulse of varied lengths
+                align()
+                play("laser_ON", "AOM")
+                measure("readout", "APD", None, time_tagging.analog(times, meas_len, counts))
+                save(counts, counts_st)  # save counts
+                wait(100)
+
+                align()
+
+                play("const", "NV", duration=125 // 4)  # pulse of varied lengths
+                wait(times_vec[i], "NV")  # variable delay in spin Echo
+                frame_rotation_2pi(0.5, "NV")  # Turns next pulse to -x
+                play("const", "NV", duration=125 // 4)  # pulse of varied lengths
+                reset_frame("NV")
+                align()
+                play("laser_ON", "AOM")
+                measure("readout", "APD", None, time_tagging.analog(times2, meas_len, counts2))
+                save(counts2, counts_2_st)  # save counts
+                wait(100, "AOM")
+
+            save(n, n_st)  # save number of iteration inside for_loop
+
+        with stream_processing():
+            counts_st.buffer(len(t_vec)).average().save("counts")
+            counts_2_st.buffer(len(t_vec)).average().save("counts2")
+            n_st.save("iteration")
+    if simulate:
+        simulation_config = SimulationConfig(duration=28000)
+        job = qmm.simulate(config, time_rabi, simulation_config)
+        job.get_simulated_samples().con1.plot()
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        return np.zeros(len(t_vec)), 0
+    else:
+        job = qm.execute(time_rabi)
+        res_handles = job.result_handles
+        times_handle = res_handles.get("counts")
+        times2_handle = res_handles.get("counts2")
+        iteration_handle = res_handles.get("iteration")
+        times_handle.wait_for_values(1)
+        times2_handle.wait_for_values(1)
+        iteration_handle.wait_for_values(1)
+        results = fetching_tool(job, data_list=["counts", "counts2", "iteration"], mode="live")
+        interrupt_on_close(fig, job)  # Interrupts the job when closing the figure
+        while results.is_processing():
+            counts, counts2, iteration = results.fetch_all()
+
+            # Progress bar (Requires execution in console)
+            progress_counter(iteration, n_avg, start_time=results.get_start_time())
+            counts += prev_counts
+            counts2 += prev_counts2
+            iteration += prev_iterations
+
+            fig, ax = plot_ramsey_live(t_vec, counts, counts2, lw=4, fig=fig, ax=ax,
+                                       elapsed_iterations=iteration)
+        job.halt()
+        return counts, counts2, iteration
+
+
+def refocus(qm, iteration=0, path='D:\\QM_OPX\\Data\\DATADUMP_DONT_USE'):
+    """
+    Dirty Jupyter Kernel hack to perform a QUDI optimizer run.
+    :param qm: Quantum Machine to start the AOM.
+    :param iteration: Current Optimizer iteration for file saving.
+    :param path: Path to the save the optimizer snapshot to.
+    """
+    with program() as laser_ON:
+        with infinite_loop_():
+            play('laser_ON', 'AOM')
+    timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
+    print('Laser ON for Refocus.')
+    job_optim = qm.execute(laser_ON)
+    command = 'optimizerlogic.start_refocus(scannerlogic.get_position(), "confocalgui")'
+    print('Running Refocus.')
+    run_kernel_command(cmd=command, wait=10)
+    path = f'{os.path.join(path, f"refocus_{iteration}_{timestamp}.npz")}'.replace('\\', '\\\\')
+    command2 = f'optimizerlogic.save_refocus_image("{path}")'
+    print(f'Saving Optimizer data to {path}.')
+    run_kernel_command(cmd=command2, wait=2)
+    print('Refocus done.')
+    job_optim.halt()
+
+
+def setup_qm():
+    """
+    Helper function to not crash other Quantum Machines. Checks for running jobs on the OPX and closes only jobs, that
+    access the same ports as the to be executed script does.
+    :return: Quantum Machines Manager, Quantum Machine Instance.
+    """
+    qmm = QuantumMachinesManager(host="192.168.1.254", port='80')
+    for machine in qmm.list_open_quantum_machines():
+        ports = qmm.get_qm(machine).get_config()['controllers']['con1']['digital_outputs']
+        if 1 in ports:
+            qmm.get_qm(machine).close()
+    return qmm, qmm.open_qm(config, close_other_machines=False)
+
