@@ -2,9 +2,10 @@ import datetime
 import json
 from lib.plot_lib import *
 
-data_path = 'D:\\QM_OPX\\Data'
+data_path = 'Z:\\quantech\\DATA'
 config_path = 'D:\\QM_OPX\\configuration.py'
 library_path = 'D:\\QM_OPX\\lib'
+
 
 def set_up_measurement(scheme, measurement_tag=None, settings_file=None, settings={'None': None}, script_path=None):
     """
@@ -26,7 +27,6 @@ def set_up_measurement(scheme, measurement_tag=None, settings_file=None, setting
     if not os.path.exists(os.path.join(data_path, year, month, daystamp)):
         os.mkdir(os.path.join(data_path, year, month, daystamp))
 
-
     dirs = next(os.walk(os.path.join(data_path, year, month, daystamp)))[1]
     dirs = [x for x in dirs if x.split('_')[0].isdigit()]
     dirs.sort(key=lambda x: int(x.split('_')[0]))
@@ -42,24 +42,25 @@ def set_up_measurement(scheme, measurement_tag=None, settings_file=None, setting
     os.mkdir(final_path)
 
     if settings_file is not None:
-        with open(config_path , 'r') as f:
-            #config_file = [line.rstrip() for line in f]
+        with open(config_path, 'r') as f:
+            # config_file = [line.rstrip() for line in f]
             config_file = f.read()
         with open(os.path.join(library_path, 'sequences.py'), 'r')  as f:
             sequence_file = f.read()
     if script_path is not None:
         with open(os.path.join(script_path), 'r') as f:
             script_file = f.read()
+    else:
+        script_file = None
 
-        #TODO INCLUDE MEASUREMENT SCRIPT + SEQUENCE SCRIPT
-        hardware_settings = {
-            'Measurement Settings': settings,
-            'OPX Config': config_file,
-            'Sequence File': sequence_file,
-            'Measurement Script': script_file,
-        }
-        with open(os.path.join(final_path, f'{settings_file}.json'), 'w+') as f:
-            json.dump(hardware_settings, f)
+    hardware_settings = {
+        'Measurement Settings': settings,
+        'OPX Config': config_file,
+        'Sequence File': sequence_file,
+        'Measurement Script': script_file,
+    }
+    with open(os.path.join(final_path, f'{settings_file}.json'), 'w+') as f:
+        json.dump(hardware_settings, f)
 
     return final_path
 
@@ -75,15 +76,6 @@ def save_data(measurement_path, scheme, filetag, *args, file_id=None, optimizer_
     :param optimizer_iteration: (int) Optimizer Iteration.
     :param kwargs: A number of keyword arguments containing instances to be saved under a specified name.
     """
-    #"""
-    #Function used to save measurement data as .npz file.
-    #:param measurement_path: (str) Path to the related measurement directory.
-    #:param filename: (str) Name of the file to save to.
-    #:param args: (np.ndarray) Arrays to save without tag.
-    #:param file_id: (str) Running file ID for the measurement directory.
-    #:param optimizer_iteration: (str) Iteration of the optimizer in every measurement run.
-    #:param kwargs: (np.ndarray) Arrays with associated name. (See np.savez documentation)
-    #"""
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H-%M-%S")
     if file_id is None:
         file_id = generate_measurement_id(measurement_path)
@@ -104,25 +96,41 @@ def save_pdf(scheme, measurement_path, filename, x, y, alternate_y=np.array([]),
     :param optimizer_iteration: (str) Iterations of the optimizer in this measurement run.
     """
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H-%M-%S")
-    file_tag = f'{file_id}_{optimizer_iteration}_{timestamp}_{scheme}__{filename}.pdf'
-    file_tag_fit = f'{file_id}_{optimizer_iteration}_{timestamp}_{scheme}__{filename}_fit.pdf'
+    file_tag_pdf = f'{file_id}_{optimizer_iteration}_{timestamp}_{scheme}__{filename}.pdf'
+    file_tag_fit_pdf = f'{file_id}_{optimizer_iteration}_{timestamp}_{scheme}__{filename}_fit.pdf'
+    file_tag_png = f'{file_id}_{optimizer_iteration}_{timestamp}_{scheme}__{filename}.png'
+    file_tag_fit_png = f'{file_id}_{optimizer_iteration}_{timestamp}_{scheme}__{filename}_fit.png'
     if scheme.lower() == 'odmr':
-        fig, ax = plot_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag), fit=0)
+        fig, ax = plot_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_pdf), fit=0)
         plt.close(fig)
-        fig, ax = plot_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_fit), fit=1)
+        fig, ax = plot_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_fit_pdf), fit=1)
+        plt.close(fig)
+        fig, ax = plot_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_png), fit=0)
+        plt.close(fig)
+        fig, ax = plot_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_fit_png), fit=1)
         plt.close(fig)
     elif scheme.lower() == 'pulsed_odmr':
-        fig, ax = plot_pulsed_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag), fit=0)
+        fig, ax = plot_pulsed_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_pdf), fit=0)
         plt.close(fig)
-        fig, ax = plot_pulsed_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_fit), fit=1)
+        fig, ax = plot_pulsed_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_fit_pdf), fit=1)
+        plt.close(fig)
+        fig, ax = plot_pulsed_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_png), fit=0)
+        plt.close(fig)
+        fig, ax = plot_pulsed_odmr(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_fit_png), fit=1)
         plt.close(fig)
     elif scheme.lower() == 'rabi':
-        fig, ax = plot_rabi(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag), fit=0)
+        fig, ax = plot_rabi(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_pdf), fit=0)
         plt.close(fig)
-        fig, ax = plot_rabi(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag), fit=1)
+        fig, ax = plot_rabi(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_pdf), fit=1)
+        plt.close(fig)
+        fig, ax = plot_rabi(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_png), fit=0)
+        plt.close(fig)
+        fig, ax = plot_rabi(x, y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_png), fit=1)
         plt.close(fig)
     elif scheme.lower() == 'ramsey':
-        fig, ax = plot_ramsey(x, y, alternate_y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag), fit=0)
+        fig, ax = plot_ramsey(x, y, alternate_y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_pdf), fit=0)
+        plt.close(fig)
+        fig, ax = plot_ramsey(x, y, alternate_y, lw=4, no_save=0, save=os.path.join(measurement_path, file_tag_png), fit=0)
         plt.close(fig)
 
 
@@ -152,8 +160,7 @@ def path_grabber(daystamp, scheme, file_id):
     """
     year = daystamp[0:4]
     month = daystamp[4:6]
-    path = 'D:\\QM_OPX\\Data'
-    scheme_path = os.path.join(path, year, month, daystamp, scheme)
+    scheme_path = os.path.join(data_path, year, month, daystamp)
     measurements = os.listdir(scheme_path)
     return [os.path.join(scheme_path, x) for x in measurements if f'{file_id}_{daystamp}' in x]
 
@@ -176,7 +183,7 @@ def file_grabber(measurement_path, meas_id=None, optim_id=None):
                          (x.split('_')[0] == str(meas_id)) and (x.split('_')[1] == str(optim_id))])
         elif meas_id is not None:
             data.append([[np.load(os.path.join(path, x)), x] for x in files if
-                         (x.split('_')[0] == str(meas_id))])
+                         (x.split('_')[1] == str(meas_id))])
         else:
             data.append([[np.load(os.path.join(path, x)), x] for x in files])
     return data

@@ -5,7 +5,7 @@ from qualang_tools.config.integration_weights_tools import convert_integration_w
 simulate = False
 
 # Frequencies
-NV_IF_freq = 306.25e6  # in units of Hz
+NV_IF_freq = 300.70e6  # in units of Hz
 NV_LO_freq = 2.57e9  # in units of Hz
 """
 Configuration file for the NV Center confocal setup.
@@ -13,11 +13,11 @@ Configuration file for the NV Center confocal setup.
 # Pulses lengths
 laser_len = 3000  # in ns
 meas_len = 600  # in ns
-long_meas_len = 10e6  # in ns
+long_meas_len = 1e6  # in ns
 odmr_meas_len = 1e6
 
 # MW parameters
-mw_amp_NV = 0.04  # in units of volts
+mw_amp_NV = 0.05622  # in units of volts
 mw_len_NV = 100  # in units of ns
 
 # Gaussian pulse parameters

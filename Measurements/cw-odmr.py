@@ -6,18 +6,22 @@ from lib.data_handler import *
 
 
 my_settings = {
-    'f_min': 2.855e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'f_max': 2.885e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'df': 0.3e6,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'n_avg': 100
+    'f_min': 2.85e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'f_max': 2.89e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'df': 2e6,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'n_avg': 10000,
+    #'optimizer_interval': 180, # duration of one measurement in seconds
+    'Laser power (mW)': 0.6,
+    'Laser power measured at': 'Infront of dichroic mirror',
+    'emission_filter': 'BasicEdge',
 }
 my_settings.update({'f_vec': np.arange(my_settings['f_min'] - NV_LO_freq, my_settings['f_max'] - NV_LO_freq + 0.1,
                                        my_settings['df']).tolist()})
 
 scheme = 'odmr'
-measurement_tag = f'hochaufgeloestes_odmr'
-work_dir = set_up_measurement(scheme, measurement_tag=measurement_tag, settings_file='measurement_settings',
-                              settings=my_settings, LP=0.9)
+measurement_tag = f'widefield_antenna_test_11'
+work_dir = set_up_measurement(scheme, measurement_tag=measurement_tag, settings_file='hardwarefile',
+                              settings=my_settings, script_path=__file__)
 
 qmm, qm = setup_qm()
 

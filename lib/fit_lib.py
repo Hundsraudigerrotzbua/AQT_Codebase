@@ -21,7 +21,7 @@ def ramsey_fit_func( x, amp, lam, n, off):
 def fit_rabi(t_vec, data, lam_g=1e-9, amp_g=1, freq_g=1 / 500, phi_g=0, off_g=0.9):
     dec_model = Model(rabi_fit_func, nan_policy='propagate')
     results = dec_model.fit(data, x=t_vec, lam=lam_g, amp=amp_g, freq=freq_g, phi=phi_g, off=off_g)
-    return results.best_fit, np.round(1/results.params['freq'].value / 2, 1)
+    return results.params , np.round(1/results.params['freq'].value / 2, 0)
 
 def fit_ramsey(t_vec, data, amp_g=1, lam_g=1/500, n_g=1, off_g=0):
     dec_model = Model(ramsey_fit_func, nan_policy='propagate')

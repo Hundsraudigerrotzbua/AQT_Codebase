@@ -1,14 +1,12 @@
 """
 A rabi experiment sweeping the time of the microwave pulse as well as the frequency and the amplitude of said pulse.
 """
-from lib.sequences import *
-from lib.data_handler import *
-from lib.misc_lib import dbm_to_vp
+from lib.misc_lib import *
 
 my_settings = {
     't_min': 16,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
     't_max': 3000,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'dt': 50,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'dt': 150,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
     'n_avg': 1.2e6
 }
 my_settings.update(
@@ -18,9 +16,9 @@ qmm, qm = setup_qm()
 simulate = False
 
 scheme = 'rabi_sweep'
-measurement_tag = f'Rabi_Time-Power_Graph'
+measurement_tag = f'power_sweep'
 work_dir = set_up_measurement(scheme, measurement_tag=measurement_tag, settings_file='measurement_settings',
-                              settings=my_settings, LP=0.9)
+                              settings=my_settings, script_path=__file__)
 
 ### AMPLITUDE ###
 amp_array = dbm_to_vp(np.linspace(-27, -6, 8))/mw_amp_NV
@@ -32,7 +30,7 @@ bw = 2e6  # Bandwidth to sweep over
 freq_array = np.concatenate(
     (np.arange(300e6 - bw // 2, NV_IF_freq, df), np.arange(NV_IF_freq, NV_IF_freq + bw // 2 + 0.1, df)))
 
-freq_array = [300e6] # Overwrite frequency for single point.
+freq_array = [301.2e6] # Overwrite frequency for single point.
 
 fig, ax = plt.subplots(1, 1)
 i = 0

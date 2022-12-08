@@ -6,17 +6,17 @@ from lib.data_handler import *
 
 my_settings = {
     't_min': 16,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    't_max': 200,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'dt': 10,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'n_avg': 3.5e6,
+    't_max': 2000,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'dt': 150,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'n_avg': 1.5e6,
     'Laser power (mW)': 0.6,
     'Laser power measured at': 'Infront of dichroic mirror',
     'emission_filter': 'BasicEdge',
 }
 my_settings.update({'t_vec': np.arange(my_settings['t_min']//4, my_settings['t_max']//4 + 0.1, my_settings['dt']//4).tolist()})
 
-scheme = 'ramsey'
-file_tag = 'ramsey_with_widefield_antenna_test_with_detuning'
+scheme = 'hahn'
+file_tag = 'hahn_echo_test'
 work_dir = set_up_measurement(scheme, measurement_tag=file_tag, settings_file='hardwarefile',
                               settings=my_settings, script_path=os.path.realpath(__file__))
 qmm, qm = setup_qm()
@@ -30,7 +30,7 @@ i = 0
 measurement_ID = generate_measurement_id(work_dir)
 while 1:
     refocus(qm, iteration=i, path=work_dir)
-    counts, counts2, iteration = ramsey(qmm, qm, fig,
+    counts, counts2, iteration = hahn(qmm, qm, fig,
                                         settings=my_settings,
                                         prev_counts=counts,
                                         prev_counts2=counts2,
