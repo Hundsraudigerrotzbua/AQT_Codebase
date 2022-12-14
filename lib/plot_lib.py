@@ -223,9 +223,9 @@ def plot_ramsey(t_vec, counts, counts2, lw=4, no_save=0,
     fig, ax = plt.subplots(1, 1)
     t_vec = 4 * np.array(t_vec)
     data = counts - counts2
-    ax.scatter(t_vec, data/np.max(data), linewidth=lw)
-    #ax.scatter(t_vec, counts, color='r', linewidth=lw)
-    #ax.scatter(t_vec, counts2, color='b', linewidth=lw)
+    #ax.scatter(t_vec, data/np.max(data), linewidth=lw)
+    ax.scatter(t_vec, counts, color='b', linewidth=lw)
+    ax.scatter(t_vec, counts2, color='r', linewidth=lw)
     for side in ax.spines.keys():
         ax.spines[side].set_linewidth(3)
     #ax.yaxis.set_ticks(np.flip(np.arange(1, min(data / np.max(data)) - 0.05, -0.05)))
@@ -253,9 +253,10 @@ def plot_ramsey_live(t_vec, counts, counts2, lw=4, fig=None, ax=None, elapsed_it
     title = f'Ramsey Iteration {elapsed_iterations}'
     t_vec = 4 * np.array(t_vec)
     #    ax.scatter(t_vec, data/np.max(data), linewidth=lw)
-    data = counts - counts2
-    ax.scatter(t_vec, data, color='r', linewidth=lw)
-    #ax.scatter(t_vec, counts2, color='b', linewidth=lw)
+    #data = counts - counts2
+    #ax.scatter(t_vec, data, color='r', linewidth=lw)
+    ax.scatter(t_vec, counts, color='b', linewidth=lw)
+    ax.scatter(t_vec, counts2, color='r', linewidth=lw)
     for side in ax.spines.keys():
         ax.spines[side].set_linewidth(3)
         #ax.yaxis.set_ticks(np.flip(np.arange(1, min(data/np.max(data))-0.05, -0.05)))
@@ -313,19 +314,30 @@ def plot_pulsed_odmr(f_vec, data, lw=4, no_save=0, save='D:\\QM_OPX\\Data\\DATAD
     else:
         fig, AX = plt.subplots(1, 1)
         norm_data = data / np.max(data)
-        f_vec = np.array(f_vec) * 1e-9 + 2.57
-        AX.scatter(f_vec, norm_data, linewidth=lw)
-        if fit:
+        f_vec_plot = np.array(f_vec) * 1e-9 + 2.57
+        AX.scatter(f_vec_plot, norm_data, linewidth=lw)
+        omega_res = f_vec_plot[np.argmin(norm_data)]
+        try:
             fhwm = [x for x in range(len(norm_data)) if
                     norm_data[x] < max(norm_data) - (max(norm_data) - min(norm_data)) / 2]
             fit_guess = [norm_data.max() - norm_data.min(),
-                         f_vec[max(fhwm)] - f_vec[min(fhwm)],
-                         f_vec[min((val, idx) for (idx, val) in enumerate(norm_data))[1]]]
-            fit = fit_odmr(f_vec, norm_data, fit_guess)
-            fit_f_vec = np.linspace(f_vec[0], f_vec[-1], 1000)
-            AX.plot(fit_f_vec, ODMR_fit_func(fit_f_vec, fit[0], fit[1], fit[2]),
-                    linewidth=lw, color='red')
-        AX.axvline(x=2.87, color='k', linewidth=lw // 2, linestyle='--')
+                         f_vec_plot[max(fhwm)] - f_vec_plot[min(fhwm)],
+                         f_vec_plot[min((val, idx) for (idx, val) in enumerate(norm_data))[1]]]
+            fit = fit_odmr(f_vec_plot, norm_data, fit_guess)
+            fit_f_vec = np.linspace(f_vec_plot[0], f_vec_plot[-1], 1000)
+            fit_data = ODMR_fit_func(fit_f_vec, fit[0], fit[1], fit[2])
+            FHWM = [x for x in range(len(fit_data)) if
+                    fit_data[x] < max(fit_data) - (max(fit_data) - min(fit_data)) / 2]
+            bw = fit_f_vec[max(FHWM)] - fit_f_vec[min(FHWM)]
+            omega_res = fit_f_vec[np.argmin(fit_data)]
+            AX.plot(fit_f_vec, fit_data,
+                    linewidth=lw, color='red',
+                    label=f'Fit $\\nu_{{res}} = ${np.round(omega_res, 4)} GHz\nFWHM = {np.round(bw * 1e3, 1)} MHz')
+            plt.legend()
+            plt.legend(loc='upper right')
+        except:
+            pass
+        AX.axvline(x=omega_res, color='k', linewidth=lw // 2, linestyle='--')
         AX.set_xlabel(xlabel)
         AX.set_ylabel(ylabel)
         for side in AX.spines.keys():
@@ -375,8 +387,30 @@ def plot_pulsed_odmr_live(f_vec, data, fig=None, AX=None, lw=4, elapsed_iteratio
         if (fig is None) or (AX is None):
             fig, AX = plt.subplots(1, 1)
         norm_data = data / np.max(data)
-        AX.scatter(np.array(f_vec) * 1e-9 + 2.57, norm_data, linewidth=lw)
-        AX.axvline(x=2.87, color='k', linewidth=lw // 2, linestyle='--')
+        f_vec_plot = np.array(f_vec) * 1e-9 + 2.57
+        AX.scatter(f_vec_plot, norm_data, linewidth=lw)
+        omega_res = f_vec_plot[np.argmin(norm_data)]
+        try:
+            fhwm = [x for x in range(len(norm_data)) if
+                    norm_data[x] < max(norm_data) - (max(norm_data) - min(norm_data)) / 2]
+            fit_guess = [norm_data.max() - norm_data.min(),
+                         f_vec_plot[max(fhwm)] - f_vec_plot[min(fhwm)],
+                         f_vec_plot[min((val, idx) for (idx, val) in enumerate(norm_data))[1]]]
+            fit = fit_odmr(f_vec_plot, norm_data, fit_guess)
+            fit_f_vec = np.linspace(f_vec_plot[0], f_vec_plot[-1], 1000)
+            fit_data = ODMR_fit_func(fit_f_vec, fit[0], fit[1], fit[2])
+            FHWM = [x for x in range(len(fit_data)) if
+                    fit_data[x] < max(fit_data) - (max(fit_data) - min(fit_data)) / 2]
+            bw = fit_f_vec[max(FHWM)] - fit_f_vec[min(FHWM)]
+            omega_res = fit_f_vec[np.argmin(fit_data)]
+            AX.plot(fit_f_vec, fit_data,
+                    linewidth=lw, color='red',
+                    label=f'Fit $\\nu_{{res}} = ${np.round(omega_res, 4)} GHz\nFWHM = {np.round(bw * 1e3, 1)} MHz')
+            plt.legend()
+            plt.legend(loc='upper right')
+        except:
+            pass
+        AX.axvline(x=omega_res, color='k', linewidth=lw // 2, linestyle='--')
         AX.set_xlabel(xlabel)
         AX.set_ylabel(ylabel)
         AX.set_title(title)

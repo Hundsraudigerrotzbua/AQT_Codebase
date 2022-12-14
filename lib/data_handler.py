@@ -150,11 +150,10 @@ def generate_measurement_id(measurement_path):
     return file_id
 
 
-def path_grabber(daystamp, scheme, file_id):
+def path_grabber(daystamp, file_id):
     """
     Helper function to navigate through the data structure easily.
     :param daystamp: (str) Day stamp of the experiment run to grab.
-    :param scheme: (str) Scheme of the experiment run to grab.
     :param file_id: (str) Experiment ID of the experiment run to grab.
     :return: (list) List of strings containing all paths to the specified experiments.
     """
@@ -162,7 +161,13 @@ def path_grabber(daystamp, scheme, file_id):
     month = daystamp[4:6]
     scheme_path = os.path.join(data_path, year, month, daystamp)
     measurements = os.listdir(scheme_path)
-    return [os.path.join(scheme_path, x) for x in measurements if f'{file_id}_{daystamp}' in x]
+    measurements = [x for x in measurements if x.split('_')[0].isdigit()]
+    if type(file_id)==list:
+
+        paths = [os.path.join(scheme_path, x) for x in measurements if int(x.split('_')[0]) in file_id]
+        return paths
+    else:
+        return [os.path.join(scheme_path, x) for x in measurements if f'{file_id}_{daystamp}' in x]
 
 
 def file_grabber(measurement_path, meas_id=None, optim_id=None):

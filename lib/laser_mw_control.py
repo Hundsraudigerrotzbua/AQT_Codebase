@@ -10,7 +10,7 @@ def run():
     with program() as counter:
         with infinite_loop_():
             play('laser_ON', 'AOM', duration=int(3000 // 4))
-            # play('const', 'NV', duration=int(3000// 4))  # play microwave pulse
+            play('const', 'NV', duration=int(3000// 4))  # play microwave pulse
 
     job = qm.execute(counter)
     try:

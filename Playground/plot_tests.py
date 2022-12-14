@@ -15,7 +15,7 @@ path = ['D:\\QM_OPX\Data\\2022\\11\\20221118\\46_20221118_16-20-19_rabi__check_i
 file = file_grabber(path)[0]
 
 fig, ax = plt.subplots(1,1)#plot_ramsey(file['times'], file['counts'], file['counts2'])
-for i in range(4,12):
+for i in range(0,len(file)):
     ax.plot(file[i][0]['times'], file[i][0]['counts'], label=f'ID {i}')
 plt.legend()
 plt.show()

@@ -15,16 +15,16 @@ matplotlib.use('Qt5Agg')
 qmm, qm = setup_qm()
 
 my_settings = {
-    'f_min': 2.855e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'f_max': 2.885e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'f_min': 2.85e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
+    'f_max': 2.89e9,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
     'df': 1e6,  # in ns, will be converted to clock cycles in the sequence (must be >= 16)
-    'n_avg': 2000000
+    'n_avg': 1000000
 }
 my_settings.update({'f_vec': np.arange(my_settings['f_min'] - NV_LO_freq, my_settings['f_max'] - NV_LO_freq + 0.1,
                                        my_settings['df']).tolist()})
 
 scheme = 'pulsed_odmr'
-measurement_tag = f'pulsed_odmr_to_determine_resonance_frequency'
+measurement_tag = f'pulsed_odmr_leipzig_sample'
 work_dir = set_up_measurement(scheme, measurement_tag=measurement_tag, settings_file='hardwarefile',
                               settings=my_settings, script_path=__file__)
 

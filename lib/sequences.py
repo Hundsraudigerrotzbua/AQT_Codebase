@@ -297,9 +297,9 @@ def pulsed_odmr(qmm, qm, fig, settings, prev_counts=0, prev_iterations=0, simula
         play("laser_ON", "AOM")
         wait(100, "AOM")
         with for_(n, 0, n < n_avg, n + 1):
-            with for_(i, test_counts.length()-1, i >= 0 , i - 1):
+            with for_(i, 0, i < test_counts.length(), i + 1):
                 update_frequency('NV', freq_vec[i])
-                play("const", "NV", duration=250 // 4)  # pulse of varied lengths
+                play("const", "NV", duration=225 // 4)  # pulse of varied lengths
                 align()
                 play("laser_ON", "AOM")
                 measure("readout", "APD", None, time_tagging.analog(times, meas_len, counts))
@@ -341,7 +341,7 @@ def pulsed_odmr(qmm, qm, fig, settings, prev_counts=0, prev_iterations=0, simula
         return counts, iteration
 
 
-def ramsey(qmm, qm, fig, settings, prev_counts=0, prev_counts2=0, prev_iterations=0, simulate=False, ax=None):
+def ramsey(qmm, qm, fig, settings, frequency=None, prev_counts=0, prev_counts2=0, prev_iterations=0, simulate=False, ax=None):
     """
 
     :param qmm: Quantum Machines Manager Instance
@@ -357,6 +357,9 @@ def ramsey(qmm, qm, fig, settings, prev_counts=0, prev_counts2=0, prev_iteration
     """
     t_vec = settings['t_vec']  # +0.1 to include t_max in array
     n_avg = settings['n_avg']
+    pi_half_time = 112.5
+    if frequency is None:
+        frequency=NV_IF_freq
     with program() as time_rabi:
         counts = declare(int)  # variable for number of counts
         counts_st = declare_stream()  # stream for counts
@@ -375,32 +378,32 @@ def ramsey(qmm, qm, fig, settings, prev_counts=0, prev_counts2=0, prev_iteration
 
         play("laser_ON", "AOM")
         wait(100, "AOM")
+        update_frequency('NV', frequency)
         with for_(n, 0, n < n_avg, n + 1):
             with for_(i, 0, i < test_counts.length(), i + 1):
-                play("const", "NV", duration=313 // 4)  # pulse of varied lengths
+                play("const", "NV", duration=pi_half_time// 4)  # pulse of varied lengths
                 align()
                 wait(times_vec[i], 'NV')
-                play("const", "NV", duration=313 // 4)  # pulse of varied lengths
+                play("const", "NV", duration=pi_half_time // 4)  # pulse of varied lengths
                 align()
                 play("laser_ON", "AOM")
                 measure("readout", "APD", None, time_tagging.analog(times, meas_len, counts))
                 assign(test_counts[i], counts + test_counts[i])
                 save(test_counts[i], counts_st)  # save counts
-                wait(500)
 
                 align()
 
-                play("const", "NV", duration=313 // 4)  # pulse of varied lengths
+                play("const", "NV", duration=pi_half_time // 4)  # pulse of varied lengths
                 wait(times_vec[i], "NV")  # variable delay in spin Echo
                 frame_rotation_2pi(0.5, "NV")  # Turns next pulse to -x
-                play("const", "NV", duration=313 // 4)  # pulse of varied lengths
+                play("const", "NV", duration=pi_half_time // 4)  # pulse of varied lengths
                 reset_frame("NV")
                 align()
                 play("laser_ON", "AOM")
                 measure("readout", "APD", None, time_tagging.analog(times2, meas_len, counts2))
                 assign(test_counts2[i], counts2 + test_counts2[i])
                 save(test_counts2[i], counts_2_st)  # save counts
-                wait(500, "AOM")
+                wait(100)
 
             save(n, n_st)  # save number of iteration inside for_loop
 
