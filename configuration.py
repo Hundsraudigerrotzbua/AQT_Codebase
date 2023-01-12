@@ -5,7 +5,7 @@ from qualang_tools.config.integration_weights_tools import convert_integration_w
 simulate = False
 
 # Frequencies
-NV_IF_freq = 301.00e6  # in units of Hz
+NV_IF_freq = 200.00e6  # in units of Hz
 NV_LO_freq = 2.57e9  # in units of Hz
 """
 Configuration file for the NV Center confocal setup.
@@ -17,7 +17,7 @@ long_meas_len = 1e6  # in ns
 odmr_meas_len = 1e6
 
 # MW parameters
-mw_amp_NV = 0.4  # in units of volts
+mw_amp_NV = 0.2  # in units of volts peak voltage! NOT Vpp!
 mw_len_NV = 100  # in units of ns
 
 # Gaussian pulse parameters
@@ -63,8 +63,8 @@ config = {
                 # 2: {'offset': 0.002, 'delay': 80}, #75},  # NV Q
 
                 # LO Leakage for Confocal Antenna for 0.07 Vp OPX Config
-                1: {'offset': 0.013, 'delay': 80},  # 75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
-                2: {'offset': 0.001, 'delay': 80},  # 75},  # NV Q
+                1: {'offset': 0.01385, 'delay': 73},  # 75},  # NV I for OPX+ 1: {'offset': 0.0, 'delay': 0}
+                2: {'offset': -0.0021, 'delay': 73},  # 75},  # NV Q
 
                 4: {'offset': 0.0},
 

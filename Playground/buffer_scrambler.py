@@ -16,7 +16,7 @@ with program() as buffer_test:
     with for_(i, 0, i < 10000000, i + 1):
         with for_(N, 0, N < 100, N + 1):
             save(N, a_st)
-            wait(40)
+            wait(400)
 
         # Waiting time after writing all entries in the buffer. I was able to observe the buffer shift
         # at up to 20µs waiting time. Did not proceed with increased waiting time, since measurements take too long with
