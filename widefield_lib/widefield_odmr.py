@@ -12,11 +12,11 @@ import ctypes
 qmm = QuantumMachinesManager(host="192.168.1.254", port='80')
 qm = qmm.open_qm(config, close_other_machines=False)
 
-def start_MW():
+def start_MW(MW_freq, MW_pwr):
     MW = OPX_MW()
     MW.activate()
     print('MW Settings:')
-    print(MW.set_cw(frequency=NV_LO_freq, power=NV_LO_pwr))  # MW settings for the IQ mixer
+    print(MW.set_cw(frequency=MW_freq, power=MW_pwr))  # MW settings for the IQ mixer
     print('Power up LO...')
     MW.cw_on()
     return MW
@@ -67,14 +67,6 @@ def capture(frames_per_window, frequency):
     results = fetching_tool(job, data_list=["frame"], mode="live")
     return results, job
 
-
-
-# LO settings
-MW_settings = {
-    'frequency': NV_LO_freq,    # base frequency for IQ mixing
-    'power': 13,            # for the LO of the IQ mixer
-}
-
 # Camera settings
 # buffer time to allow MW signal to be fully established
 t_puffer = 100e-6 * 1e9
@@ -92,7 +84,7 @@ n_frames_per_window = cm_frames_per_window
 begin = datetime.datetime.now()
 print(
     f'Starting {begin.strftime("%d.%m.%y - %H:%M:%S")} - {n_frames_per_window} frames per frequency...')
-MW = start_MW()
+MW = start_MW(NV_LO_freq, NV_LO_pwr)
 print('Starting run...')
 results, job = capture(n_frames_per_window, f_vec_OPX)
 while results.is_processing():

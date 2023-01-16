@@ -13,7 +13,8 @@ This can either be read out through the software return of the API or a digital 
 analog inputs and 1 digital input, which are all in use, the software solution has to be used.
 """
 
-path_to_lib = 'D:\\Widefield\\Code\\PICAM_Code\\shared_lib.so'
+# Compiled with g++ -shared -fPIC -ID:\\Widefield\\Code\\PICAM_samples\\includes -LD:\\Widefield\\Code\\PICAM_samples\\libraries64 shared_lib.cpp -o test_compile2.so -lPicam
+path_to_lib = 'D:\\Widefield\\Code\\PICAM_Code\\test_compile3.so'
 lib = ctypes.cdll.LoadLibrary(path_to_lib)
 lib.main.restype = ctypes.c_int
 lib.main.argtypes = ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)

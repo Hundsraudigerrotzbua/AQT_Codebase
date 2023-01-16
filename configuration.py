@@ -17,7 +17,7 @@ long_meas_len = 1e6  # in ns
 odmr_meas_len = 1e6
 
 # MW parameters
-mw_amp_NV = 0.2  # in units of volts peak voltage! NOT Vpp!
+mw_amp_NV = 0.25  # in units of volts peak voltage! NOT Vpp!
 mw_len_NV = 100  # in units of ns
 
 # Gaussian pulse parameters
